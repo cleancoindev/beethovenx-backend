@@ -32,7 +32,6 @@ export class BeetsService {
         const cached = await cache.getObjectValue<GqlBeetsProtocolData>(PROTOCOL_DATA_CACHE_KEY);
 
         if (cached) {
-            console.log('protocol data cached');
             return cached;
         }
         if (!cached) {

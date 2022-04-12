@@ -39,11 +39,11 @@ export class BlocksSubgraphService {
     public async getAverageBlockTime(): Promise<number> {
         const avgBlockTime = await cache.getValue(AVG_BLOCK_TIME_CACHE_PREFIX);
 
-        if (avgBlockTime !== null) {
+        if (avgBlockTime) {
             return parseFloat(avgBlockTime);
         }
 
-        return this.cacheAverageBlockTime();
+        return 0;
     }
 
     public async cacheAverageBlockTime(): Promise<number> {

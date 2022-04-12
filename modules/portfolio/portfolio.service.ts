@@ -38,52 +38,53 @@ class PortfolioService {
     }
 
     public async getPortfolio(address: string): Promise<UserPortfolioData> {
-        const cached = await cache.getObjectValue<UserPortfolioData | { empty: true }>(
-            `${PORTFOLIO_USER_DATA_CACHE_KEY_PREFIX}${address}`,
-        );
+        return this.emptyPortfolioData;
+        // const cached = await cache.getObjectValue<UserPortfolioData | { empty: true }>(
+        //     `${PORTFOLIO_USER_DATA_CACHE_KEY_PREFIX}${address}`,
+        // );
 
-        if (cached !== null) {
-            return 'empty' in cached ? this.emptyPortfolioData : cached;
-        }
+        // if (cached !== null) {
+        //     return 'empty' in cached ? this.emptyPortfolioData : cached;
+        // }
 
-        const data = await this.dataService.getPortfolioDataForNow(address);
+        // const data = await this.dataService.getPortfolioDataForNow(address);
 
-        if (data === null) {
-            await cache.putObjectValue(`${PORTFOLIO_USER_DATA_CACHE_KEY_PREFIX}${address}`, { empty: true }, 0.5);
+        // if (data === null) {
+        //     await cache.putObjectValue(`${PORTFOLIO_USER_DATA_CACHE_KEY_PREFIX}${address}`, { empty: true }, 0.5);
 
-            return this.emptyPortfolioData;
-        }
+        //     return this.emptyPortfolioData;
+        // }
 
-        const tokenPrices = await tokenPriceService.getTokenPrices();
-        const historicalTokenPrices = await tokenPriceService.getHistoricalTokenPrices();
-        const previousTokenPrices = tokenPriceService.getTokenPricesForTimestamp(
-            data.previousBlock.timestamp,
-            historicalTokenPrices,
-        );
+        // const tokenPrices = await tokenPriceService.getTokenPrices();
+        // const historicalTokenPrices = await tokenPriceService.getHistoricalTokenPrices();
+        // const previousTokenPrices = tokenPriceService.getTokenPricesForTimestamp(
+        //     data.previousBlock.timestamp,
+        //     historicalTokenPrices,
+        // );
 
-        const poolData = this.getUserPoolData(
-            data.pools,
-            data.block,
-            data.previousBlock,
-            tokenPrices,
-            previousTokenPrices,
-        );
-        const tokens = this.tokensFromUserPoolData(poolData);
+        // const poolData = this.getUserPoolData(
+        //     data.pools,
+        //     data.block,
+        //     data.previousBlock,
+        //     tokenPrices,
+        //     previousTokenPrices,
+        // );
+        // const tokens = this.tokensFromUserPoolData(poolData);
 
-        const response: UserPortfolioData = {
-            pools: poolData,
-            tokens,
-            timestamp: moment().unix(),
-            date: moment().format('YYYY-MM-DD'),
-            totalValue: _.sumBy(poolData, 'totalValue'),
-            totalSwapFees: _.sumBy(poolData, 'swapFees'),
-            totalSwapVolume: _.sumBy(poolData, 'swapVolume'),
-            myFees: _.sumBy(poolData, 'myFees'),
-        };
+        // const response: UserPortfolioData = {
+        //     pools: poolData,
+        //     tokens,
+        //     timestamp: moment().unix(),
+        //     date: moment().format('YYYY-MM-DD'),
+        //     totalValue: _.sumBy(poolData, 'totalValue'),
+        //     totalSwapFees: _.sumBy(poolData, 'swapFees'),
+        //     totalSwapVolume: _.sumBy(poolData, 'swapVolume'),
+        //     myFees: _.sumBy(poolData, 'myFees'),
+        // };
 
-        await cache.putObjectValue(`${PORTFOLIO_USER_DATA_CACHE_KEY_PREFIX}${address}`, response, 0.5);
+        // await cache.putObjectValue(`${PORTFOLIO_USER_DATA_CACHE_KEY_PREFIX}${address}`, response, 0.5);
 
-        return response;
+        // return response;
     }
 
     public async cacheRawDataForTimestamp(timestamp: number): Promise<void> {

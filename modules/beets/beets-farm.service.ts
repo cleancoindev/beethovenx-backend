@@ -39,12 +39,7 @@ export class BeetsFarmService {
 
     public async getBeetsFarms(): Promise<GqlBeetsFarm[]> {
         const farms = await cache.getObjectValue<GqlBeetsFarm[]>(FARMS_CACHE_KEY);
-
-        if (farms) {
-            return farms;
-        }
-
-        return this.cacheBeetsFarms();
+        return farms ?? [];
     }
 
     public async cacheBeetsFarms(): Promise<GqlBeetsFarm[]> {
@@ -132,73 +127,76 @@ export class BeetsFarmService {
         return mapped;
     }
 
-    public async getBeetsFarmUsers(): Promise<GqlBeetsFarmUser[]> {
-        const memCached = this.cache.get(FARM_USERS_CACHE_KEY) as GqlBeetsFarmUser[] | null;
-
-        if (memCached) {
-            return memCached;
-        }
-
-        const cached = await cache.getObjectValue<GqlBeetsFarmUser[]>(FARM_USERS_CACHE_KEY);
-
-        if (cached) {
-            this.cache.put(FARM_USERS_CACHE_KEY, cached, 15000);
-
-            return cached;
-        }
-
-        return this.cacheBeetsFarmUsers();
-    }
-
     public async getBeetsFarmsForUser(userAddress: string): Promise<GqlBeetsFarmUser[]> {
-        const farmUsers = await this.getBeetsFarmUsers();
-
-        return farmUsers.filter((farmUser) => farmUser.address.toLowerCase() === userAddress);
+        const farmUsers = await cache.getObjectValue<GqlBeetsFarmUser[]>(this.getFarmUserCacheKey(userAddress));
+        return farmUsers ?? [];
     }
 
     public async getBeetsFarmUser(farmId: string, userAddress: string): Promise<GqlBeetsFarmUser | null> {
-        const farmUsers = await this.getBeetsFarmUsers();
-        const farmUser = farmUsers.find(
-            (farmUser) => farmUser.farmId === farmId.toLowerCase() && farmUser.address === userAddress.toLowerCase(),
-        );
+        // const farmUsers = await this.getBeetsFarmUsers();
+        const farmUsers = await cache.getObjectValue<GqlBeetsFarmUser[]>(this.getFarmUserCacheKey(userAddress));
+        if (!farmUsers) {
+            return null;
+        }
+        const farmUser = farmUsers.find((farmUser) => farmUser.farmId === farmId.toLowerCase());
 
         return farmUser ?? null;
     }
 
-    public async cacheBeetsFarmUsers(reload?: boolean): Promise<GqlBeetsFarmUser[]> {
-        const existing = (await cache.getObjectValue<GqlBeetsFarmUser[]>(FARM_USERS_CACHE_KEY)) || [];
+    public async cacheBeetsFarmUsers(reload?: boolean): Promise<void> {
+        // const existing = (await cache.getObjectValue<GqlBeetsFarmUser[]>(FARM_USERS_CACHE_KEY)) || [];
 
-        if (reload) {
-            await cache.putValue(FARM_USERS_RELOAD_CACHE_KEY, 'true');
-        } else {
-            const reloading = await cache.getValue(FARM_USERS_RELOAD_CACHE_KEY);
+        // if (reload) {
+        //     await cache.putValue(FARM_USERS_RELOAD_CACHE_KEY, 'true');
+        // } else {
+        //     const reloading = await cache.getValue(FARM_USERS_RELOAD_CACHE_KEY);
 
-            if (reloading === 'true') {
-                console.log('reloading, skipping cacheBeetsFarmUsers');
-                return existing;
-            }
-        }
+        //     if (reloading === 'true') {
+        //         console.log('reloading, skipping cacheBeetsFarmUsers');
+        //         return;
+        //     }
+        // }
 
         const currentUnixTime = moment.utc().unix();
 
         const farmUsers = await masterchefService.getAllFarmUsers({
             where: reload ? { amount_gt: '0' } : { timestamp_gte: `${currentUnixTime - 7200}` },
         });
-        const mapped: GqlBeetsFarmUser[] = farmUsers.map((farmUser) => ({
-            ...farmUser,
-            __typename: 'GqlBeetsFarmUser',
-            farmId: farmUser.pool?.id || '',
-            pair: farmUser?.pool?.pair || '',
-        }));
+        // const mapped: GqlBeetsFarmUser[] = farmUsers.map((farmUser) => ({
+        //     ...farmUser,
+        //     __typename: 'GqlBeetsFarmUser',
+        //     farmId: farmUser.pool?.id || '',
+        //     pair: farmUser?.pool?.pair || '',
+        // }));
 
-        const ids = mapped.map((item) => item.id);
+        // const ids = mapped.map((item) => item.id);
 
-        const filtered = reload ? [] : existing.filter((item) => !ids.includes(item.id));
+        // ?
+        // const filtered = reload ? [] : existing.filter((item) => !ids.includes(item.id));
 
-        await cache.putObjectValue(FARM_USERS_CACHE_KEY, [...filtered, ...mapped]);
+        const farmsByUser: Record<string, GqlBeetsFarmUser[]> = {};
+        for (let user of farmUsers) {
+            if (user.pool) {
+                const mappedUser: GqlBeetsFarmUser = {
+                    ...user,
+                    farmId: user.pool.id,
+                    pair: user.pool.pair,
+                    __typename: 'GqlBeetsFarmUser',
+                };
+                const key = user.address.toLowerCase();
+                if (!farmsByUser[key]) {
+                    farmsByUser[key] = [mappedUser];
+                } else {
+                    farmsByUser[key].push(mappedUser);
+                }
+            }
+        }
+
+        for (let userAddress of Object.keys(farmsByUser)) {
+            await cache.putObjectValue(this.getFarmUserCacheKey(userAddress), farmsByUser[userAddress], 10);
+        }
+
         await cache.putValue(FARM_USERS_RELOAD_CACHE_KEY, 'false');
-
-        return [...filtered, ...mapped];
     }
 
     public calculateFarmApr(
@@ -319,6 +317,10 @@ export class BeetsFarmService {
             farmIds: userFarmsWithBalance.map((userFarm) => userFarm.farmId),
             farms,
         };
+    }
+
+    private getFarmUserCacheKey(userAddress: string): string {
+        return `${FARM_USERS_CACHE_KEY}:${userAddress.toLowerCase()}`;
     }
 }
 

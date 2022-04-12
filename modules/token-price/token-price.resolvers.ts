@@ -7,21 +7,7 @@ import { isAddress } from 'ethers/lib/utils';
 const resolvers: Resolvers = {
     Query: {
         tokenPriceGetCurrentPrices: async (parent, {}, context) => {
-            const tokenPrices = await tokenPriceService.getTokenPrices();
-            const keys = Object.keys(tokenPrices);
-            const prices: GqlTokenPrice[] = [];
-
-            for (const address of keys) {
-                if (
-                    isAddress(address) &&
-                    tokenPrices[address].usd !== null &&
-                    typeof tokenPrices[address].usd !== 'undefined'
-                ) {
-                    prices.push({ address, price: tokenPrices[address].usd });
-                }
-            }
-
-            return prices;
+            return tokenPriceService.getFlattenedTokenPrices();
         },
         tokenPriceGetHistoricalPrices: async (parent, { addresses }, context) => {
             const tokenPrices = await tokenPriceService.getHistoricalTokenPrices();

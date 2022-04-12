@@ -101,21 +101,19 @@ export class BeetsBarSubgraphService {
     }
 
     public async getBeetsBarNow(): Promise<BeetsBarFragment> {
-        const cached = this.cache.get(`${BEETS_BAR_NOW_CACHE_KEY}`) as BeetsBarFragment | null;
-
-        if (cached) {
-            return cached;
-        }
-
-        const { bar } = await this.sdk.GetBeetsBar({ id: env.FBEETS_ADDRESS });
-
-        if (!bar) {
+        const cached = await cache.getObjectValue<BeetsBarFragment>(`${BEETS_BAR_NOW_CACHE_KEY}`);
+        if (!cached) {
             return this.emptyBeetsBar;
         }
+        return cached;
+    }
 
-        this.cache.put(`${BEETS_BAR_NOW_CACHE_KEY}`, bar, 60000);
-
-        return bar;
+    public async cacheBeetsBarNow(): Promise<void> {
+        let { bar } = await this.sdk.GetBeetsBar({ id: env.FBEETS_ADDRESS });
+        if (!bar) {
+            bar = this.emptyBeetsBar;
+        }
+        await cache.putObjectValue(BEETS_BAR_NOW_CACHE_KEY, bar, 1);
     }
 
     public async getUser(userAddress: string): Promise<BeetsBarUserFragment | null> {

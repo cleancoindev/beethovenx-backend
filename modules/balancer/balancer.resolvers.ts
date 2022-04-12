@@ -17,17 +17,7 @@ const balancerResolvers: Resolvers = {
             };
         },
         pools: async (parent, {}, context) => {
-            const id = uuidv4();
-            const pools = await balancerService.getPools();
-
-            return pools.map((pool) => ({
-                ...pool,
-                __typename: 'GqlBalancerPool',
-                tokens: (pool.tokens || []).map((token) => ({
-                    ...token,
-                    __typename: 'GqlBalancerPoolToken',
-                })),
-            }));
+            return balancerService.getPools();
         },
         poolsJSON: async (parent, {}, context) => {
             const pools = await balancerService.getPools();

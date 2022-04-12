@@ -10,9 +10,15 @@ import _ from 'lodash';
 import { env } from '../../app/env';
 import { beetsBarService } from '../beets-bar-subgraph/beets-bar.service';
 import { getUserFBeetsInWalletBalance } from './beets';
+import { cache } from '../cache/cache';
 
+const USER_POOL_DATA_CACHE_KEY_PREFIX = 'user-pool-data';
 export class BeetsPoolService {
     public async getUserPoolData(userAddress: string): Promise<GqlBeetsUserPoolData> {
+        const cachedData = await cache.getObjectValue<GqlBeetsUserPoolData>(this.getUserPoolCacheKey(userAddress));
+        if (cachedData) {
+            return cachedData;
+        }
         const pools = await balancerService.getPools();
         const userFarms = await beetsFarmService.getBeetsFarmsForUser(userAddress);
         const sharesOwned = await balancerService.getUserPoolShares(userAddress);
@@ -23,11 +29,17 @@ export class BeetsPoolService {
         const data: GqlBeetsUserPoolPoolData[] = [];
 
         for (const pool of pools) {
+            const userFarm = userFarms.find((userFarm) => addressesMatch(userFarm.pair, pool.address));
+            const shares = sharesOwned.find((shares) => shares.poolAddress === pool.address);
+
+            // if there are no shares & nothing in the farm, we skip it
+            if ((!shares || shares?.balance === '0') && (!userFarm || userFarm?.amount === '0')) {
+                continue;
+            }
+
             let balanceScaled = BigNumber.from(0);
             let farmBalanceScaled = BigNumber.from(0);
             const farm = farms.find((farm) => addressesMatch(farm.pair, pool.address));
-            const userFarm = userFarms.find((userFarm) => addressesMatch(userFarm.pair, pool.address));
-            const shares = sharesOwned.find((shares) => shares.poolAddress === pool.address);
             const hasUnstakedBpt = farm && farm.allocPoint > 0 && userFarm && shares && parseFloat(shares.balance) > 0;
 
             if (userFarm) {
@@ -160,13 +172,20 @@ export class BeetsPoolService {
             }),
         );
 
-        return {
+        const poolData = {
             pools: data,
             totalBalanceUSD: `${totalBalanceUSD}`,
             averageApr: `${averageApr}`,
             totalFarmBalanceUSD: `${totalFarmBalanceUSD}`,
             averageFarmApr: `${averageFarmApr}`,
         };
+
+        await cache.putObjectValue(this.getUserPoolCacheKey(userAddress), poolData, 0.15);
+        return poolData;
+    }
+
+    private getUserPoolCacheKey(userAddress: string) {
+        return `${USER_POOL_DATA_CACHE_KEY_PREFIX}:${userAddress.toLowerCase()}`;
     }
 }
 

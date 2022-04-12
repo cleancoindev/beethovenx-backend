@@ -32,13 +32,13 @@ const balancerResolvers: Resolvers = {
 
             return beetsPoolService.getUserPoolData(address);
         },
-        beetsGetUserPendingRewards: async (parent, {}, context) => {
-            const address = getRequiredAccountAddress(context);
+        // beetsGetUserPendingRewards: async (parent, {}, context) => {
+        //     const address = getRequiredAccountAddress(context);
 
-            return {
-                farm: await beetsFarmService.getUserPendingFarmRewards(address),
-            };
-        },
+        //     return {
+        //         farm: await beetsFarmService.getUserPendingFarmRewards(address),
+        //     };
+        // },
     },
 };
 

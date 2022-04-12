@@ -77,21 +77,9 @@ export class BalancerService {
     }
 
     public async getPools(): Promise<GqlBalancerPool[]> {
-        const memCached = this.cache.get(POOLS_CACHE_KEY) as GqlBalancerPool[] | null;
-
-        if (memCached) {
-            return memCached;
-        }
-
         const cached = await cache.getObjectValue<GqlBalancerPool[]>(POOLS_CACHE_KEY);
 
-        if (cached) {
-            this.cache.put(POOLS_CACHE_KEY, cached, 10000);
-
-            return cached;
-        }
-
-        return this.cachePools();
+        return cached ?? [];
     }
 
     public async getPastPools(): Promise<BalancerPoolFragment[]> {
@@ -250,6 +238,9 @@ export class BalancerService {
             };
 
             decoratedPool.composition = this.getPoolComposition(pool, tokenPrices);
+            if (!decoratedPool.tokens) {
+                decoratedPool.tokens = [];
+            }
 
             decoratedPools.push(decoratedPool);
         }

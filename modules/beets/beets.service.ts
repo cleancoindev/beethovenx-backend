@@ -23,21 +23,34 @@ export class BeetsService {
     }
 
     public async getProtocolData(): Promise<GqlBeetsProtocolData> {
-        const memCached = this.cache.get(PROTOCOL_DATA_CACHE_KEY) as GqlBeetsProtocolData | null;
+        // const memCached = this.cache.get(PROTOCOL_DATA_CACHE_KEY) as GqlBeetsProtocolData | null;
 
-        if (memCached) {
-            return memCached;
-        }
+        // if (memCached) {
+        //     return memCached;
+        // }
 
         const cached = await cache.getObjectValue<GqlBeetsProtocolData>(PROTOCOL_DATA_CACHE_KEY);
 
         if (cached) {
-            this.cache.put(PROTOCOL_DATA_CACHE_KEY, cached, 15000);
-
             return cached;
         }
+        if (!cached) {
+            const { beetsPrice, fbeetsPrice } = await tokenPriceService.getBeetsPrice();
+            return {
+                beetsPrice: beetsPrice.toString(),
+                fbeetsPrice: fbeetsPrice.toString(),
+                poolCount: 'unknown',
+                circulatingSupply: 'unknown',
+                marketCap: 'unknown',
+                totalLiquidity: 'unknown',
+                totalSwapFee: 'unknown',
+                totalSwapVolume: 'unknown',
+                swapVolume24h: 'unknown',
+                swapFee24h: 'unknown',
+            };
+        }
 
-        return this.cacheProtocolData();
+        return cached;
     }
 
     public async cacheProtocolData(): Promise<GqlBeetsProtocolData> {

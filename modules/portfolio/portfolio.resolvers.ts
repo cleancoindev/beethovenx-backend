@@ -20,9 +20,10 @@ const resolvers: Resolvers = {
         portfolioGetUserPortfolioHistory: async (parent, {}, context) => {
             const accountAddress = getRequiredAccountAddress(context);
 
-            const portfolioHistoryData = await portfolioService.getPortfolioHistory(accountAddress);
+            // const portfolioHistoryData = await portfolioService.getPortfolioHistory(accountAddress);
 
-            return portfolioHistoryData.map((data) => portfolioService.mapPortfolioDataToGql(data));
+            // return portfolioHistoryData.map((data) => portfolioService.mapPortfolioDataToGql(data));
+            return [];
         },
         portfolioGetUserPortfolioHistoryAdmin: async (parent, {}, context) => {
             isAdminRoute(context);

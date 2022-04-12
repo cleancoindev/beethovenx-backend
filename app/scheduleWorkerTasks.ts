@@ -27,7 +27,7 @@ export function scheduleWorkerTasks() {
     });
 
     //every five minutes
-    cron.schedule('*/5 * * * *', async () => {
+    cron.schedule('*/12 * * * *', async () => {
         try {
             console.log('Cache historycal token prices...');
             console.time('history-token-price-cache');
@@ -39,7 +39,7 @@ export function scheduleWorkerTasks() {
         }
     });
 
-    cron.schedule('*/5 * * * *', async () => {
+    cron.schedule('*/13 * * * *', async () => {
         try {
             console.log('Cache historical nested bpt prices...');
             console.time('cache-historical-nested-bpt-prices');
@@ -69,7 +69,7 @@ export function scheduleWorkerTasks() {
         } catch (e) {}
     });
 
-    cron.schedule('*/5 * * * *', async () => {
+    cron.schedule('*/10 * * * *', async () => {
         try {
             console.log('Cache average block time...');
             console.time('cache-average-block-time');
@@ -81,7 +81,7 @@ export function scheduleWorkerTasks() {
         }
     });
     //every 5 seconds
-    cron.schedule('*/5 * * * * *', async () => {
+    cron.schedule('*/10 * * * * *', async () => {
         try {
             console.log('Cache beets farms');
             const label = `cache-beets-farms-${moment().format('YYYY-MM-DD-HH-mm-ss')}`;
@@ -95,7 +95,7 @@ export function scheduleWorkerTasks() {
     });
 
     //every 5 seconds
-    cron.schedule('*/5 * * * * *', async () => {
+    cron.schedule('*/30 * * * * *', async () => {
         try {
             console.log('Cache pools...');
             const label = `cache-pools-${moment().format('YYYY-MM-DD-HH-mm-ss')}}`;
@@ -131,17 +131,13 @@ export function scheduleWorkerTasks() {
         console.timeEnd('sor-reload-graph');
     });
 
-    //every 30 seconds
-    cron.schedule('*/30 * * * * *', async () => {
-        try {
-            console.log('Cache beets farms...');
-            console.time('cache-beets-farms');
-            await beetsFarmService.cacheBeetsFarms();
-            console.log('Cache beets farms done');
-            console.timeEnd('cache-beets-farms');
-        } catch (e) {
-            console.log('Error caching beets farms', e);
-        }
+    // once a minutes
+    cron.schedule('* * * * *', async () => {
+        console.log('cache beets bar');
+        console.time('cache-beets-bar');
+        await beetsBarService.cacheBeetsBarNow();
+        console.log('cache beets bar done');
+        console.timeEnd('cache-beets-bar');
     });
 
     //every 10 seconds
@@ -149,10 +145,10 @@ export function scheduleWorkerTasks() {
         try {
             console.log('Cache beets farm users...');
             const label = `cache-beets-farm-users-${moment().format('YYYY-MM-DD-HH-mm-ss')}`;
-            console.time('Cache beets farm users...');
+            console.time(label);
             await beetsFarmService.cacheBeetsFarmUsers();
             console.log('Cache beets farm users done');
-            console.timeEnd('Cache beets farm users...');
+            console.timeEnd(label);
         } catch (e) {
             console.log('Error caching beets farm users', e);
         }
@@ -169,26 +165,26 @@ export function scheduleWorkerTasks() {
         } catch (e) {
             console.log('Error caching beets price', e);
         }
-        try {
-            console.log('Cache portfolio pools data...');
-            console.time('cache-portfolio-pools-data');
-            const previousBlock = await blocksSubgraphService.getBlockFrom24HoursAgo();
-            await balancerSubgraphService.cachePortfolioPoolsData(parseInt(previousBlock.number));
-            console.log('Cache portfolio pools data done');
-            console.timeEnd('cache-portfolio-pools-data');
-        } catch (e) {
-            console.log('Error caching portfolio pools data', e);
-        }
+        // try {
+        //     console.log('Cache portfolio pools data...');
+        //     console.time('cache-portfolio-pools-data');
+        //     const previousBlock = await blocksSubgraphService.getBlockFrom24HoursAgo();
+        //     await balancerSubgraphService.cachePortfolioPoolsData(parseInt(previousBlock.number));
+        //     console.log('Cache portfolio pools data done');
+        //     console.timeEnd('cache-portfolio-pools-data');
+        // } catch (e) {
+        //     console.log('Error caching portfolio pools data', e);
+        // }
 
-        try {
-            console.log('Cache past pools...');
-            console.time('cache-past-pools');
-            await balancerService.cachePastPools();
-            console.log('Cache past pools done');
-            console.timeEnd('cache-past-pools');
-        } catch (e) {
-            console.log('Error caching past pools', e);
-        }
+        // try {
+        //     console.log('Cache past pools...');
+        //     console.time('cache-past-pools');
+        //     await balancerService.cachePastPools();
+        //     console.log('Cache past pools done');
+        //     console.timeEnd('cache-past-pools');
+        // } catch (e) {
+        //     console.log('Error caching past pools', e);
+        // }
 
         try {
             console.log('Cache protocol data...');
@@ -240,6 +236,9 @@ export function scheduleWorkerTasks() {
     beetsFarmService
         .cacheBeetsFarmUsers(true)
         .catch((error) => console.log('Error caching initial beets farm users', error));
+    blocksSubgraphService
+        .cacheAverageBlockTime()
+        .catch((error) => console.log('Error caching initial avg block time', error));
 
     console.log('scheduled cron jobs');
 }

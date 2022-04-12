@@ -15,9 +15,11 @@ import LinearPoolAbi from '../balancer/abi/LinearPool.json';
 import { formatFixed } from '@ethersproject/bignumber';
 import { BalancerPoolFragment } from '../balancer-subgraph/generated/balancer-subgraph-types';
 import { blocksSubgraphService } from '../blocks-subgraph/blocks-subgraph.service';
-import moment from 'moment-timezone';
+import { GqlTokenPrice } from '../../schema';
+import { isAddress } from 'ethers/lib/utils';
 
 const TOKEN_PRICES_CACHE_KEY = 'token-prices';
+const TOKEN_PRICES_FLAT_CACHE_KEY = 'token-prices-flat';
 const TOKEN_HISTORICAL_PRICES_CACHE_KEY = 'token-historical-prices';
 const NESTED_BPT_HISTORICAL_PRICES_CACHE_KEY = 'nested-bpt-historical-prices';
 const BEETS_PRICE_CACHE_KEY = 'token-prices:beets-price';
@@ -44,6 +46,10 @@ export class TokenPriceService {
         }
 
         return tokenPrices || {};
+    }
+    public async getFlattenedTokenPrices(): Promise<GqlTokenPrice[]> {
+        const cached = await cache.getObjectValue<GqlTokenPrice[]>(TOKEN_PRICES_FLAT_CACHE_KEY);
+        return cached ?? [];
     }
 
     public async getHistoricalTokenPrices(): Promise<TokenHistoricalPrices> {
@@ -126,6 +132,23 @@ export class TokenPriceService {
         //recache if the coingecko request was successful, or if there are no cached token prices
         if (coingeckoRequestSuccessful || cached === null) {
             await cache.putObjectValue(TOKEN_PRICES_CACHE_KEY, tokenPrices, 30);
+
+            const keys = Object.keys(tokenPrices);
+            const prices: GqlTokenPrice[] = [];
+
+            for (const address of keys) {
+                if (
+                    !(
+                        isAddress(address) &&
+                        tokenPrices[address].usd !== null &&
+                        typeof tokenPrices[address].usd !== 'undefined'
+                    )
+                ) {
+                    continue;
+                }
+                prices.push({ address, price: tokenPrices[address].usd });
+            }
+            await cache.putObjectValue(TOKEN_PRICES_FLAT_CACHE_KEY, prices, 30);
         }
     }
 

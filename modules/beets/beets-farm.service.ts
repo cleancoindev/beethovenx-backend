@@ -39,12 +39,7 @@ export class BeetsFarmService {
 
     public async getBeetsFarms(): Promise<GqlBeetsFarm[]> {
         const farms = await cache.getObjectValue<GqlBeetsFarm[]>(FARMS_CACHE_KEY);
-
-        if (farms) {
-            return farms;
-        }
-
-        return this.cacheBeetsFarms();
+        return farms ?? [];
     }
 
     public async cacheBeetsFarms(): Promise<GqlBeetsFarm[]> {
@@ -132,9 +127,7 @@ export class BeetsFarmService {
     }
 
     public async getBeetsFarmsForUser(userAddress: string): Promise<GqlBeetsFarmUser[]> {
-        console.log('get BEEEEEEEEEEETS');
         const farmUsers = await cache.getObjectValue<GqlBeetsFarmUser[]>(this.getFarmUserCacheKey(userAddress));
-        console.log('farm users ', farmUsers);
         return farmUsers ?? [];
     }
 
@@ -180,11 +173,9 @@ export class BeetsFarmService {
         // ?
         // const filtered = reload ? [] : existing.filter((item) => !ids.includes(item.id));
 
-        console.log('CAHHHIEEEEE', farmUsers.length);
         const farmsByUser: Record<string, GqlBeetsFarmUser[]> = {};
         for (let user of farmUsers) {
             if (user.pool) {
-                console.log('mapping user');
                 const mappedUser: GqlBeetsFarmUser = {
                     ...user,
                     farmId: user.pool.id,
@@ -205,8 +196,6 @@ export class BeetsFarmService {
         }
 
         await cache.putValue(FARM_USERS_RELOAD_CACHE_KEY, 'false');
-
-        // return [...filtered, ...mapped];
     }
 
     public calculateFarmApr(

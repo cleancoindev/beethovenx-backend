@@ -1,7 +1,13 @@
 import { GraphQLClient } from 'graphql-request';
+import { Cache, CacheClass } from 'memory-cache';
+import { env } from '../../app/env';
+import { cacheWriter } from '../cache/cache-writer';
+import { cacheReader } from '../cache/cache-reader';
+import { subgraphLoadAll, subgraphPurgeCacheKeyAtBlock } from '../util/subgraph-util';
+import { twentyFourHoursInMs } from '../util/time';
+import { BalancerUserPoolShare } from './balancer-subgraph-types';
 import {
     Balancer,
-    BalancerJoinExitFragment,
     BalancerJoinExitsQuery,
     BalancerJoinExitsQueryVariables,
     BalancerLatestPriceFragment,
@@ -11,7 +17,6 @@ import {
     BalancerPoolQuery,
     BalancerPoolQueryVariables,
     BalancerPoolShareFragment,
-    BalancerPoolSharesQuery,
     BalancerPoolSharesQueryVariables,
     BalancerPoolSnapshotFragment,
     BalancerPoolSnapshotsQuery,
@@ -33,19 +38,11 @@ import {
     BalancerUsersQueryVariables,
     getSdk,
 } from './generated/balancer-subgraph-types';
-import { env } from '../../app/env';
-import _ from 'lodash';
-import { subgraphLoadAll, subgraphPurgeCacheKeyAtBlock } from '../util/subgraph-util';
-import { Cache, CacheClass } from 'memory-cache';
-import { fiveMinutesInMs, fiveMinutesInSeconds, twentyFourHoursInMs } from '../util/time';
-import { cache } from '../cache/cache';
-import { BalancerUserPoolShare } from './balancer-subgraph-types';
 
 const ALL_USERS_CACHE_KEY = 'balance-subgraph_all-users';
 const ALL_POOLS_CACHE_KEY = 'balance-subgraph_all-pools';
 const ALL_JOIN_EXITS_CACHE_KEY = 'balance-subgraph_all-join-exits';
 const PORTFOLIO_POOLS_CACHE_KEY = 'balance-subgraph_portfolio-pools';
-const USER_CACHE_KEY_PREFIX = 'balance-subgraph_user:';
 
 export class BalancerSubgraphService {
     private cache: CacheClass<string, any>;
@@ -170,27 +167,18 @@ export class BalancerSubgraphService {
     public async cachePortfolioPoolsData(previousBlockNumber: number): Promise<BalancerPortfolioPoolsDataQuery> {
         const response = await this.sdk.BalancerPortfolioPoolsData({ previousBlockNumber });
 
-        await cache.putObjectValue(PORTFOLIO_POOLS_CACHE_KEY, response, 5);
+        await cacheWriter.putObjectValue(PORTFOLIO_POOLS_CACHE_KEY, response, 5);
 
         return response;
     }
 
-    public async getPortfolioPoolsData(previousBlockNumber: number): Promise<BalancerPortfolioPoolsDataQuery> {
-        const memCached = this.cache.get(PORTFOLIO_POOLS_CACHE_KEY) as BalancerPortfolioPoolsDataQuery | null;
-
-        if (memCached) {
-            return memCached;
-        }
-
-        const cached = await cache.getObjectValue<BalancerPortfolioPoolsDataQuery>(PORTFOLIO_POOLS_CACHE_KEY);
+    public async getPortfolioPoolsData(previousBlockNumber: number): Promise<BalancerPortfolioPoolsDataQuery | null> {
+        const cached = await cacheReader.getObjectValue<BalancerPortfolioPoolsDataQuery>(PORTFOLIO_POOLS_CACHE_KEY);
 
         if (cached) {
-            this.cache.put(PORTFOLIO_POOLS_CACHE_KEY, cached, fiveMinutesInMs);
-
             return cached;
         }
-
-        return this.cachePortfolioPoolsData(previousBlockNumber);
+        return null;
     }
 
     public async getAllPoolsAtBlock(block: number): Promise<BalancerPoolFragment[]> {

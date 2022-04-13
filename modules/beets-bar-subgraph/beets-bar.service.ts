@@ -10,7 +10,8 @@ import {
 import { blocksSubgraphService } from '../blocks-subgraph/blocks-subgraph.service';
 import { Cache, CacheClass } from 'memory-cache';
 import { oneDayInMinutes, twentyFourHoursInMs } from '../util/time';
-import { cache } from '../cache/cache';
+import { cacheReader } from '../cache/cache-reader';
+import { cacheWriter } from '../cache/cache-writer';
 
 const ALL_USERS_CACHE_KEY = 'beets-bar-subgraph_all-users';
 const BEETS_BAR_CACHE_KEY_PREFIX = 'beets-bar:';
@@ -27,7 +28,7 @@ export class BeetsBarSubgraphService {
     }
 
     public async getFbeetsApr(): Promise<number> {
-        const cached = await cache.getValue(FBEETS_APR_CACHE_KEY);
+        const cached = await cacheReader.getValue(FBEETS_APR_CACHE_KEY);
 
         if (cached !== null) {
             return parseFloat(cached);
@@ -50,7 +51,7 @@ export class BeetsBarSubgraphService {
         const diff = ratio - prevRatio;
         const estimatedYield = diff * 12;
 
-        await cache.putValue(FBEETS_APR_CACHE_KEY, `${estimatedYield / prevRatio}`, oneDayInMinutes);
+        await cacheWriter.putValue(FBEETS_APR_CACHE_KEY, `${estimatedYield / prevRatio}`, oneDayInMinutes);
 
         return estimatedYield / prevRatio;
     }
@@ -101,7 +102,7 @@ export class BeetsBarSubgraphService {
     }
 
     public async getBeetsBarNow(): Promise<BeetsBarFragment> {
-        const cached = await cache.getObjectValue<BeetsBarFragment>(`${BEETS_BAR_NOW_CACHE_KEY}`);
+        const cached = await cacheReader.getObjectValue<BeetsBarFragment>(`${BEETS_BAR_NOW_CACHE_KEY}`);
         if (!cached) {
             return this.emptyBeetsBar;
         }
@@ -113,7 +114,7 @@ export class BeetsBarSubgraphService {
         if (!bar) {
             bar = this.emptyBeetsBar;
         }
-        await cache.putObjectValue(BEETS_BAR_NOW_CACHE_KEY, bar, 1);
+        await cacheWriter.putObjectValue(BEETS_BAR_NOW_CACHE_KEY, bar, 1);
     }
 
     public async getUser(userAddress: string): Promise<BeetsBarUserFragment | null> {

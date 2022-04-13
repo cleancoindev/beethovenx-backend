@@ -1,10 +1,11 @@
 import Safe, { ContractNetworksConfig, EthersAdapter } from '@gnosis.pm/safe-core-sdk';
 import { ethers, providers } from 'ethers';
 import { env } from '../../app/env';
-import { cache } from '../cache/cache';
+import { cacheReader } from '../cache/cache-reader';
 import { getAddress } from 'ethers/lib/utils';
 import { Cache, CacheClass } from 'memory-cache';
 import { GraphQLClient } from 'graphql-request';
+import { cacheWriter } from '../cache/cache-writer';
 
 const CACHE_KEY_PREFIX = 'gnosis-address-is-multisig_';
 const TIMEOUT = 2592000; //30 days
@@ -19,7 +20,7 @@ const contractNetworks: ContractNetworksConfig = {
 
 export async function isAddressGnosisSafe(address: string) {
     const key = `${CACHE_KEY_PREFIX}${address}`;
-    const cachedValue = await cache.getValue(key);
+    const cachedValue = await cacheReader.getValue(key);
 
     if (cachedValue) {
         return cachedValue === 'true';
@@ -32,10 +33,10 @@ export async function isAddressGnosisSafe(address: string) {
             contractNetworks,
         });
 
-        await cache.putValue(key, 'true', TIMEOUT);
+        await cacheWriter.putValue(key, 'true', TIMEOUT);
         return true;
     } catch {
-        await cache.putValue(key, 'false', TIMEOUT);
+        await cacheWriter.putValue(key, 'false', TIMEOUT);
         return false;
     }
 }

@@ -4,7 +4,8 @@ import { resolve } from 'path';
 type Env = EnvType<typeof schema>;
 
 export const schema = {
-    REDIS_URL: String,
+    REDIS_WRITE_URL: String,
+    REDIS_READ_URL: String,
     REDIS_PORT: Number,
     PORT: Number,
     NODE_ENV: String,

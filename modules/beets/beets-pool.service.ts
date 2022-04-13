@@ -1,24 +1,18 @@
-import { GqlBeetsUserPoolData, GqlBeetsUserPoolPoolData } from '../../schema';
-import { beetsFarmService } from './beets-farm.service';
-import { balancerService } from '../balancer/balancer.service';
+import { getAddress } from '@ethersproject/address';
 import { formatFixed, parseFixed } from '@ethersproject/bignumber';
 import { BigNumber } from 'ethers';
-import { tokenPriceService } from '../token-price/token-price.service';
-import { getAddress } from '@ethersproject/address';
-import { addressesMatch } from '../util/addresses';
 import _ from 'lodash';
 import { env } from '../../app/env';
+import { GqlBeetsUserPoolData, GqlBeetsUserPoolPoolData } from '../../schema';
+import { balancerService } from '../balancer/balancer.service';
 import { beetsBarService } from '../beets-bar-subgraph/beets-bar.service';
+import { tokenPriceService } from '../token-price/token-price.service';
+import { addressesMatch } from '../util/addresses';
 import { getUserFBeetsInWalletBalance } from './beets';
-import { cache } from '../cache/cache';
+import { beetsFarmService } from './beets-farm.service';
 
-const USER_POOL_DATA_CACHE_KEY_PREFIX = 'user-pool-data';
 export class BeetsPoolService {
     public async getUserPoolData(userAddress: string): Promise<GqlBeetsUserPoolData> {
-        const cachedData = await cache.getObjectValue<GqlBeetsUserPoolData>(this.getUserPoolCacheKey(userAddress));
-        if (cachedData) {
-            return cachedData;
-        }
         const pools = await balancerService.getPools();
         const userFarms = await beetsFarmService.getBeetsFarmsForUser(userAddress);
         const sharesOwned = await balancerService.getUserPoolShares(userAddress);
@@ -33,7 +27,11 @@ export class BeetsPoolService {
             const shares = sharesOwned.find((shares) => shares.poolAddress === pool.address);
 
             // if there are no shares & nothing in the farm, we skip it
-            if ((!shares || shares?.balance === '0') && (!userFarm || userFarm?.amount === '0')) {
+            if (
+                pool.id !== env.FBEETS_POOL_ID &&
+                (!shares || shares?.balance === '0') &&
+                (!userFarm || userFarm?.amount === '0')
+            ) {
                 continue;
             }
 
@@ -180,12 +178,7 @@ export class BeetsPoolService {
             averageFarmApr: `${averageFarmApr}`,
         };
 
-        await cache.putObjectValue(this.getUserPoolCacheKey(userAddress), poolData, 0.15);
         return poolData;
-    }
-
-    private getUserPoolCacheKey(userAddress: string) {
-        return `${USER_POOL_DATA_CACHE_KEY_PREFIX}:${userAddress.toLowerCase()}`;
     }
 }
 

@@ -165,26 +165,26 @@ export function scheduleWorkerTasks() {
         } catch (e) {
             console.log('Error caching beets price', e);
         }
-        // try {
-        //     console.log('Cache portfolio pools data...');
-        //     console.time('cache-portfolio-pools-data');
-        //     const previousBlock = await blocksSubgraphService.getBlockFrom24HoursAgo();
-        //     await balancerSubgraphService.cachePortfolioPoolsData(parseInt(previousBlock.number));
-        //     console.log('Cache portfolio pools data done');
-        //     console.timeEnd('cache-portfolio-pools-data');
-        // } catch (e) {
-        //     console.log('Error caching portfolio pools data', e);
-        // }
+        try {
+            console.log('Cache portfolio pools data...');
+            console.time('cache-portfolio-pools-data');
+            const previousBlock = await blocksSubgraphService.getBlockFrom24HoursAgo();
+            await balancerSubgraphService.cachePortfolioPoolsData(parseInt(previousBlock.number));
+            console.log('Cache portfolio pools data done');
+            console.timeEnd('cache-portfolio-pools-data');
+        } catch (e) {
+            console.log('Error caching portfolio pools data', e);
+        }
 
-        // try {
-        //     console.log('Cache past pools...');
-        //     console.time('cache-past-pools');
-        //     await balancerService.cachePastPools();
-        //     console.log('Cache past pools done');
-        //     console.timeEnd('cache-past-pools');
-        // } catch (e) {
-        //     console.log('Error caching past pools', e);
-        // }
+        try {
+            console.log('Cache past pools...');
+            console.time('cache-past-pools');
+            await balancerService.cachePastPools();
+            console.log('Cache past pools done');
+            console.timeEnd('cache-past-pools');
+        } catch (e) {
+            console.log('Error caching past pools', e);
+        }
 
         try {
             console.log('Cache protocol data...');

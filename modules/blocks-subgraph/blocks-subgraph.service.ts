@@ -1,13 +1,9 @@
 import { GraphQLClient } from 'graphql-request';
-import {
-    Block_OrderBy,
-    BlockFragment,
-    BlocksQuery,
-    BlocksQueryVariables,
-    getSdk,
-    OrderDirection,
-} from './generated/blocks-subgraph-types';
+import moment from 'moment-timezone';
 import { env } from '../../app/env';
+import { cacheWriter } from '../cache/cache-writer';
+import { cacheReader } from '../cache/cache-reader';
+import { subgraphLoadAll } from '../util/subgraph-util';
 import {
     fiveMinutesInSeconds,
     getDailyTimestampsForDays,
@@ -16,9 +12,14 @@ import {
     secondsPerDay,
     secondsPerYear,
 } from '../util/time';
-import { subgraphLoadAll } from '../util/subgraph-util';
-import { cache } from '../cache/cache';
-import moment from 'moment-timezone';
+import {
+    BlockFragment,
+    BlocksQuery,
+    BlocksQueryVariables,
+    Block_OrderBy,
+    getSdk,
+    OrderDirection,
+} from './generated/blocks-subgraph-types';
 
 const DAILY_BLOCKS_CACHE_KEY = 'block-subgraph_daily-blocks';
 const AVG_BLOCK_TIME_CACHE_PREFIX = 'block-subgraph:average-block-time';
@@ -37,7 +38,7 @@ export class BlocksSubgraphService {
     }
 
     public async getAverageBlockTime(): Promise<number> {
-        const avgBlockTime = await cache.getValue(AVG_BLOCK_TIME_CACHE_PREFIX);
+        const avgBlockTime = await cacheReader.getValue(AVG_BLOCK_TIME_CACHE_PREFIX);
 
         if (avgBlockTime) {
             return parseFloat(avgBlockTime);
@@ -86,7 +87,7 @@ export class BlocksSubgraphService {
             timestamp = parseInt(block.timestamp);
         }
 
-        await cache.putValue(AVG_BLOCK_TIME_CACHE_PREFIX, `${averageBlockTime / blocks.length}`);
+        await cacheWriter.putValue(AVG_BLOCK_TIME_CACHE_PREFIX, `${averageBlockTime / blocks.length}`);
 
         return averageBlockTime / blocks.length;
     }
@@ -129,7 +130,7 @@ export class BlocksSubgraphService {
     }*/
 
     public async getBlockFrom24HoursAgo(): Promise<BlockFragment> {
-        const cached = await cache.getObjectValue<BlockFragment>(BLOCK_24H_AGO);
+        const cached = await cacheReader.getObjectValue<BlockFragment>(BLOCK_24H_AGO);
 
         if (cached) {
             return cached;
@@ -161,7 +162,7 @@ export class BlocksSubgraphService {
         const allBlocks = await this.getAllBlocks(args);
 
         if (allBlocks.length > 0) {
-            await cache.putObjectValue(BLOCK_24H_AGO, allBlocks[0], 0.25);
+            await cacheWriter.putObjectValue(BLOCK_24H_AGO, allBlocks[0], 0.25);
         }
 
         return allBlocks[0];
@@ -201,7 +202,7 @@ export class BlocksSubgraphService {
             },
         };
 
-        const cacheResult = await cache.getObjectValue<BlockFragment[]>(
+        const cacheResult = await cacheReader.getObjectValue<BlockFragment[]>(
             `${DAILY_BLOCKS_CACHE_KEY}:${today}:${numDays}`,
         );
 
@@ -224,7 +225,7 @@ export class BlocksSubgraphService {
             }
         }
 
-        await cache.putObjectValue(`${DAILY_BLOCKS_CACHE_KEY}:${today}:${numDays}`, blocks, oneDayInMinutes);
+        await cacheWriter.putObjectValue(`${DAILY_BLOCKS_CACHE_KEY}:${today}:${numDays}`, blocks, oneDayInMinutes);
 
         return blocks;
     }

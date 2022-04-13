@@ -1,22 +1,21 @@
-import { Price, TokenHistoricalPrices, TokenPrices } from './token-price-types';
-import { coingeckoService } from './lib/coingecko.service';
-import { balancerPriceService } from './lib/balancer-price.service';
-import { sleep } from '../util/promise';
-import _ from 'lodash';
-import { env } from '../../app/env';
-import { cache } from '../cache/cache';
-import { Cache, CacheClass } from 'memory-cache';
-
-import { getAddress } from 'ethers/lib/utils';
-import { balancerSubgraphService } from '../balancer-subgraph/balancer-subgraph.service';
-import { beetsBarService } from '../beets-bar-subgraph/beets-bar.service';
-import { getContractAt } from '../ethers/ethers';
-import LinearPoolAbi from '../balancer/abi/LinearPool.json';
 import { formatFixed } from '@ethersproject/bignumber';
-import { BalancerPoolFragment } from '../balancer-subgraph/generated/balancer-subgraph-types';
-import { blocksSubgraphService } from '../blocks-subgraph/blocks-subgraph.service';
+import { getAddress, isAddress } from 'ethers/lib/utils';
+import _ from 'lodash';
+import { Cache, CacheClass } from 'memory-cache';
+import { env } from '../../app/env';
 import { GqlTokenPrice } from '../../schema';
-import { isAddress } from 'ethers/lib/utils';
+import { balancerSubgraphService } from '../balancer-subgraph/balancer-subgraph.service';
+import { BalancerPoolFragment } from '../balancer-subgraph/generated/balancer-subgraph-types';
+import LinearPoolAbi from '../balancer/abi/LinearPool.json';
+import { beetsBarService } from '../beets-bar-subgraph/beets-bar.service';
+import { blocksSubgraphService } from '../blocks-subgraph/blocks-subgraph.service';
+import { cacheWriter } from '../cache/cache-writer';
+import { cacheReader } from '../cache/cache-reader';
+import { getContractAt } from '../ethers/ethers';
+import { sleep } from '../util/promise';
+import { balancerPriceService } from './lib/balancer-price.service';
+import { coingeckoService } from './lib/coingecko.service';
+import { Price, TokenHistoricalPrices, TokenPrices } from './token-price-types';
 
 const TOKEN_PRICES_CACHE_KEY = 'token-prices';
 const TOKEN_PRICES_FLAT_CACHE_KEY = 'token-prices-flat';
@@ -39,7 +38,7 @@ export class TokenPriceService {
             return memCached;
         }
 
-        const tokenPrices = await cache.getObjectValue<TokenPrices>(TOKEN_PRICES_CACHE_KEY);
+        const tokenPrices = await cacheReader.getObjectValue<TokenPrices>(TOKEN_PRICES_CACHE_KEY);
 
         if (tokenPrices) {
             this.cache.put(TOKEN_PRICES_CACHE_KEY, tokenPrices, 5000);
@@ -48,7 +47,7 @@ export class TokenPriceService {
         return tokenPrices || {};
     }
     public async getFlattenedTokenPrices(): Promise<GqlTokenPrice[]> {
-        const cached = await cache.getObjectValue<GqlTokenPrice[]>(TOKEN_PRICES_FLAT_CACHE_KEY);
+        const cached = await cacheReader.getObjectValue<GqlTokenPrice[]>(TOKEN_PRICES_FLAT_CACHE_KEY);
         return cached ?? [];
     }
 
@@ -59,8 +58,8 @@ export class TokenPriceService {
             return memCached;
         }
 
-        const tokenPrices = await cache.getObjectValue<TokenHistoricalPrices>(TOKEN_HISTORICAL_PRICES_CACHE_KEY);
-        const nestedBptPrices = await cache.getObjectValue<TokenHistoricalPrices>(
+        const tokenPrices = await cacheReader.getObjectValue<TokenHistoricalPrices>(TOKEN_HISTORICAL_PRICES_CACHE_KEY);
+        const nestedBptPrices = await cacheReader.getObjectValue<TokenHistoricalPrices>(
             NESTED_BPT_HISTORICAL_PRICES_CACHE_KEY,
         );
 
@@ -126,12 +125,12 @@ export class TokenPriceService {
             [env.NATIVE_ASSET_ADDRESS]: nativeAssetPrice || balancerTokenPrices[env.WRAPPED_NATIVE_ASSET_ADDRESS],
         };
 
-        const cached = await cache.getObjectValue<TokenPrices>(TOKEN_PRICES_CACHE_KEY);
+        const cached = await cacheReader.getObjectValue<TokenPrices>(TOKEN_PRICES_CACHE_KEY);
         const coingeckoRequestSuccessful = Object.keys(coingeckoTokenPrices).length > 0;
 
         //recache if the coingecko request was successful, or if there are no cached token prices
         if (coingeckoRequestSuccessful || cached === null) {
-            await cache.putObjectValue(TOKEN_PRICES_CACHE_KEY, tokenPrices, 30);
+            await cacheWriter.putObjectValue(TOKEN_PRICES_CACHE_KEY, tokenPrices, 30);
 
             const keys = Object.keys(tokenPrices);
             const prices: GqlTokenPrice[] = [];
@@ -148,7 +147,7 @@ export class TokenPriceService {
                 }
                 prices.push({ address, price: tokenPrices[address].usd });
             }
-            await cache.putObjectValue(TOKEN_PRICES_FLAT_CACHE_KEY, prices, 30);
+            await cacheWriter.putObjectValue(TOKEN_PRICES_FLAT_CACHE_KEY, prices, 30);
         }
     }
 
@@ -177,7 +176,7 @@ export class TokenPriceService {
             });
         }
 
-        await cache.putObjectValue(TOKEN_HISTORICAL_PRICES_CACHE_KEY, tokenPrices);
+        await cacheWriter.putObjectValue(TOKEN_HISTORICAL_PRICES_CACHE_KEY, tokenPrices);
 
         return tokenPrices;
     }
@@ -185,7 +184,7 @@ export class TokenPriceService {
     public async cacheHistoricalNestedBptPrices() {
         const pools = await balancerSubgraphService.getAllPools({});
         const { nestedBptAddresses } = await this.getTokenAddresses(pools);
-        const historicalTokenPrices = await cache.getObjectValue<TokenHistoricalPrices>(
+        const historicalTokenPrices = await cacheReader.getObjectValue<TokenHistoricalPrices>(
             TOKEN_HISTORICAL_PRICES_CACHE_KEY,
         );
 
@@ -217,7 +216,7 @@ export class TokenPriceService {
             }
         }
 
-        await cache.putObjectValue(NESTED_BPT_HISTORICAL_PRICES_CACHE_KEY, nestedBptHistoricalPrices);
+        await cacheWriter.putObjectValue(NESTED_BPT_HISTORICAL_PRICES_CACHE_KEY, nestedBptHistoricalPrices);
     }
 
     public getPriceForToken(tokenPrices: TokenPrices, address: string): number {
@@ -233,8 +232,8 @@ export class TokenPriceService {
         beetsPrice: number;
         fbeetsPrice: number;
     }> {
-        const beetsPrice = await cache.getValue(BEETS_PRICE_CACHE_KEY);
-        const fbeetsPrice = await cache.getValue(FBEETS_PRICE_CACHE_KEY);
+        const beetsPrice = await cacheReader.getValue(BEETS_PRICE_CACHE_KEY);
+        const fbeetsPrice = await cacheReader.getValue(FBEETS_PRICE_CACHE_KEY);
 
         if (!beetsPrice || !fbeetsPrice) {
             throw new Error('did not find price for beets');
@@ -270,8 +269,8 @@ export class TokenPriceService {
             ((parseFloat(beets.weight || '0') / parseFloat(usdc.weight || '1')) * parseFloat(usdc.balance)) /
             parseFloat(beets.balance);
 
-        await cache.putValue(BEETS_PRICE_CACHE_KEY, `${beetsPrice}`, 30);
-        await cache.putValue(FBEETS_PRICE_CACHE_KEY, `${fbeetsPrice}`, 30);
+        await cacheWriter.putValue(BEETS_PRICE_CACHE_KEY, `${beetsPrice}`, 30);
+        await cacheWriter.putValue(FBEETS_PRICE_CACHE_KEY, `${fbeetsPrice}`, 30);
     }
 
     public async getTokenAddresses(

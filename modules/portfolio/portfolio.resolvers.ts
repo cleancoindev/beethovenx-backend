@@ -1,12 +1,12 @@
+import moment from 'moment-timezone';
 import { Resolvers } from '../../schema';
-import { portfolioService } from './portfolio.service';
-import { getRequiredAccountAddress, isAdminRoute } from '../util/resolver-util';
 import { balancerSubgraphService } from '../balancer-subgraph/balancer-subgraph.service';
-import { masterchefService } from '../masterchef-subgraph/masterchef.service';
 import { beetsBarService } from '../beets-bar-subgraph/beets-bar.service';
 import { blocksSubgraphService } from '../blocks-subgraph/blocks-subgraph.service';
-import moment from 'moment-timezone';
-import { cache } from '../cache/cache';
+import { cacheWriter } from '../cache/cache-writer';
+import { masterchefService } from '../masterchef-subgraph/masterchef.service';
+import { getRequiredAccountAddress, isAdminRoute } from '../util/resolver-util';
+import { portfolioService } from './portfolio.service';
 
 const resolvers: Resolvers = {
     Query: {
@@ -20,10 +20,9 @@ const resolvers: Resolvers = {
         portfolioGetUserPortfolioHistory: async (parent, {}, context) => {
             const accountAddress = getRequiredAccountAddress(context);
 
-            // const portfolioHistoryData = await portfolioService.getPortfolioHistory(accountAddress);
+            const portfolioHistoryData = await portfolioService.getPortfolioHistory(accountAddress);
 
-            // return portfolioHistoryData.map((data) => portfolioService.mapPortfolioDataToGql(data));
-            return [];
+            return portfolioHistoryData.map((data) => portfolioService.mapPortfolioDataToGql(data));
         },
         portfolioGetUserPortfolioHistoryAdmin: async (parent, {}, context) => {
             isAdminRoute(context);
@@ -46,7 +45,7 @@ const resolvers: Resolvers = {
         clearCachedPortfolioHistories: async (parent, {}, context) => {
             isAdminRoute(context);
 
-            await cache.deleteAllMatchingPattern('portfolio:data:history:*');
+            await cacheWriter.deleteAllMatchingPattern('portfolio:data:history:*');
 
             return true;
         },

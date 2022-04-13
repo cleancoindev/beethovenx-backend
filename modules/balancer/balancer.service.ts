@@ -29,7 +29,7 @@ import {
 } from '../../schema';
 import _ from 'lodash';
 import { Cache, CacheClass } from 'memory-cache';
-import { cache } from '../cache/cache';
+import { cacheReader } from '../cache/cache-reader';
 import { tokenPriceService } from '../token-price/token-price.service';
 import { TokenPrices } from '../token-price/token-price-types';
 import { beetsFarmService } from '../beets/beets-farm.service';
@@ -38,6 +38,7 @@ import { BalancerBoostedPoolService } from '../pools/balancer-boosted-pool.servi
 import { spookySwapService } from '../boosted/spooky-swap.service';
 import { formatFixed } from '@ethersproject/bignumber';
 import { BalancerUserPoolShare } from '../balancer-subgraph/balancer-subgraph-types';
+import { cacheWriter } from '../cache/cache-writer';
 
 const POOLS_CACHE_KEY = 'pools:all';
 const PAST_POOLS_CACHE_KEY = 'pools:24h';
@@ -77,7 +78,7 @@ export class BalancerService {
     }
 
     public async getPools(): Promise<GqlBalancerPool[]> {
-        const cached = await cache.getObjectValue<GqlBalancerPool[]>(POOLS_CACHE_KEY);
+        const cached = await cacheReader.getObjectValue<GqlBalancerPool[]>(POOLS_CACHE_KEY);
 
         return cached ?? [];
     }
@@ -89,7 +90,7 @@ export class BalancerService {
             return memCached;
         }
 
-        const cached = await cache.getObjectValue<BalancerPoolFragment[]>(PAST_POOLS_CACHE_KEY);
+        const cached = await cacheReader.getObjectValue<BalancerPoolFragment[]>(PAST_POOLS_CACHE_KEY);
 
         if (cached) {
             this.cache.put(PAST_POOLS_CACHE_KEY, cached, 10000);
@@ -245,7 +246,7 @@ export class BalancerService {
             decoratedPools.push(decoratedPool);
         }
 
-        await cache.putObjectValue(POOLS_CACHE_KEY, decoratedPools);
+        await cacheWriter.putObjectValue(POOLS_CACHE_KEY, decoratedPools);
 
         return decoratedPools;
     }
@@ -271,13 +272,13 @@ export class BalancerService {
             return true;
         });
 
-        await cache.putObjectValue(PAST_POOLS_CACHE_KEY, filtered);
+        await cacheWriter.putObjectValue(PAST_POOLS_CACHE_KEY, filtered);
 
         return filtered;
     }
 
     public async poolGet24hData(poolId: string): Promise<GqlBalancerPool24h> {
-        const cached = await cache.getObjectValue<GqlBalancerPool24h>(`${POOLS_24H_CACHE_KEY}${poolId}`);
+        const cached = await cacheReader.getObjectValue<GqlBalancerPool24h>(`${POOLS_24H_CACHE_KEY}${poolId}`);
 
         if (cached) {
             return cached;
@@ -303,7 +304,7 @@ export class BalancerService {
             swapFees24h: `${parseFloat(pool.totalSwapFee) - parseFloat(previousPool.totalSwapFee)}`,
         };
 
-        await cache.putObjectValue(`${POOLS_24H_CACHE_KEY}${poolId}`, data, 5);
+        await cacheWriter.putObjectValue(`${POOLS_24H_CACHE_KEY}${poolId}`, data, 10);
 
         return data;
     }
@@ -397,13 +398,13 @@ export class BalancerService {
     }
 
     public async getTopTradingPairs(): Promise<BalancerTradePairSnapshotFragment[]> {
-        const cached = await cache.getObjectValue<BalancerTradePairSnapshotFragment[]>(TOP_TRADE_PAIRS_CACHE_KEY);
+        const cached = await cacheReader.getObjectValue<BalancerTradePairSnapshotFragment[]>(TOP_TRADE_PAIRS_CACHE_KEY);
 
         if (cached) {
             return cached;
         }
 
-        return this.cacheTopTradingPairs();
+        return [];
     }
 
     public async cacheTopTradingPairs(): Promise<BalancerTradePairSnapshotFragment[]> {
@@ -416,7 +417,7 @@ export class BalancerService {
             where: { timestamp_gt: timestamp },
         });
 
-        await cache.putObjectValue(TOP_TRADE_PAIRS_CACHE_KEY, tradePairSnapshots, oneDayInMinutes);
+        await cacheWriter.putObjectValue(TOP_TRADE_PAIRS_CACHE_KEY, tradePairSnapshots, oneDayInMinutes);
 
         return tradePairSnapshots;
     }
@@ -466,10 +467,10 @@ export class BalancerService {
         });
         const poolSharesUserMap = _.groupBy(poolShares, 'userAddress');
         const userAddresses = Object.keys(poolSharesUserMap);
-        const existingKeys = await cache.getAllKeysMatchingPattern(POOL_SHARES_CACHE_KEY_PREFIX);
+        const existingKeys = await cacheReader.getAllKeysMatchingPattern(POOL_SHARES_CACHE_KEY_PREFIX);
 
         for (const userAddress of userAddresses) {
-            await cache.putObjectValue(
+            await cacheWriter.putObjectValue(
                 `${POOL_SHARES_CACHE_KEY_PREFIX}${userAddress}`,
                 poolSharesUserMap[userAddress],
                 30,
@@ -481,14 +482,14 @@ export class BalancerService {
 
         //if a user exits the only pool they're in, we need to remove the stale key
         for (const emptyKey of emptyKeys) {
-            await cache.deleteKey(emptyKey);
+            await cacheWriter.deleteKey(emptyKey);
         }
 
         return poolShares;
     }
 
     public async getUserPoolShares(userAddress: string): Promise<BalancerUserPoolShare[]> {
-        const poolShares = await cache.getObjectValue<BalancerUserPoolShare[]>(
+        const poolShares = await cacheReader.getObjectValue<BalancerUserPoolShare[]>(
             `${POOL_SHARES_CACHE_KEY_PREFIX}${userAddress.toLowerCase()}`,
         );
 

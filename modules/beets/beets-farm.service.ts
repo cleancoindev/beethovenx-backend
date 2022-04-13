@@ -11,7 +11,7 @@ import {
 import { masterchefService } from '../masterchef-subgraph/masterchef.service';
 import { oneDayInMinutes, secondsPerYear } from '../util/time';
 import { Cache, CacheClass } from 'memory-cache';
-import { cache } from '../cache/cache';
+import { cacheReader } from '../cache/cache-reader';
 import { tokenPriceService } from '../token-price/token-price.service';
 import { tokenService } from '../token/token.service';
 import { masterChefContractService } from '../masterchef/master-chef-contract.service';
@@ -23,6 +23,7 @@ import { addressesMatch } from '../util/addresses';
 import { BigNumber } from 'ethers';
 import { blocksSubgraphService } from '../blocks-subgraph/blocks-subgraph.service';
 import moment from 'moment-timezone';
+import { cacheWriter } from '../cache/cache-writer';
 
 const FARMS_CACHE_KEY = 'beetsFarms';
 const FARM_USERS_CACHE_KEY = 'beetsFarmUsers';
@@ -38,7 +39,7 @@ export class BeetsFarmService {
     }
 
     public async getBeetsFarms(): Promise<GqlBeetsFarm[]> {
-        const farms = await cache.getObjectValue<GqlBeetsFarm[]>(FARMS_CACHE_KEY);
+        const farms = await cacheReader.getObjectValue<GqlBeetsFarm[]>(FARMS_CACHE_KEY);
         return farms ?? [];
     }
 
@@ -122,19 +123,19 @@ export class BeetsFarmService {
             };
         });
 
-        await cache.putObjectValue(FARMS_CACHE_KEY, mapped, oneDayInMinutes);
+        await cacheWriter.putObjectValue(FARMS_CACHE_KEY, mapped, oneDayInMinutes);
 
         return mapped;
     }
 
     public async getBeetsFarmsForUser(userAddress: string): Promise<GqlBeetsFarmUser[]> {
-        const farmUsers = await cache.getObjectValue<GqlBeetsFarmUser[]>(this.getFarmUserCacheKey(userAddress));
+        const farmUsers = await cacheReader.getObjectValue<GqlBeetsFarmUser[]>(this.getFarmUserCacheKey(userAddress));
         return farmUsers ?? [];
     }
 
     public async getBeetsFarmUser(farmId: string, userAddress: string): Promise<GqlBeetsFarmUser | null> {
         // const farmUsers = await this.getBeetsFarmUsers();
-        const farmUsers = await cache.getObjectValue<GqlBeetsFarmUser[]>(this.getFarmUserCacheKey(userAddress));
+        const farmUsers = await cacheReader.getObjectValue<GqlBeetsFarmUser[]>(this.getFarmUserCacheKey(userAddress));
         if (!farmUsers) {
             return null;
         }
@@ -144,35 +145,11 @@ export class BeetsFarmService {
     }
 
     public async cacheBeetsFarmUsers(reload?: boolean): Promise<void> {
-        // const existing = (await cache.getObjectValue<GqlBeetsFarmUser[]>(FARM_USERS_CACHE_KEY)) || [];
-
-        // if (reload) {
-        //     await cache.putValue(FARM_USERS_RELOAD_CACHE_KEY, 'true');
-        // } else {
-        //     const reloading = await cache.getValue(FARM_USERS_RELOAD_CACHE_KEY);
-
-        //     if (reloading === 'true') {
-        //         console.log('reloading, skipping cacheBeetsFarmUsers');
-        //         return;
-        //     }
-        // }
-
         const currentUnixTime = moment.utc().unix();
 
         const farmUsers = await masterchefService.getAllFarmUsers({
             where: reload ? { amount_gt: '0' } : { timestamp_gte: `${currentUnixTime - 7200}` },
         });
-        // const mapped: GqlBeetsFarmUser[] = farmUsers.map((farmUser) => ({
-        //     ...farmUser,
-        //     __typename: 'GqlBeetsFarmUser',
-        //     farmId: farmUser.pool?.id || '',
-        //     pair: farmUser?.pool?.pair || '',
-        // }));
-
-        // const ids = mapped.map((item) => item.id);
-
-        // ?
-        // const filtered = reload ? [] : existing.filter((item) => !ids.includes(item.id));
 
         const farmsByUser: Record<string, GqlBeetsFarmUser[]> = {};
         for (let user of farmUsers) {
@@ -189,14 +166,14 @@ export class BeetsFarmService {
                 } else {
                     farmsByUser[key].push(mappedUser);
                 }
+            } else {
+                console.log('no pool', user.address);
             }
         }
 
         for (let userAddress of Object.keys(farmsByUser)) {
-            await cache.putObjectValue(this.getFarmUserCacheKey(userAddress), farmsByUser[userAddress], 10);
+            await cacheWriter.putObjectValue(this.getFarmUserCacheKey(userAddress), farmsByUser[userAddress]);
         }
-
-        await cache.putValue(FARM_USERS_RELOAD_CACHE_KEY, 'false');
     }
 
     public calculateFarmApr(

@@ -1,6 +1,4 @@
-import { BalancerUserFragment } from '../balancer-subgraph/generated/balancer-subgraph-types';
-import { cache } from '../cache/cache';
-import { thirtyDaysInSeconds } from './time';
+import { cacheWriter } from '../cache/cache-writer';
 
 export async function subgraphLoadAll<T>(
     request: (variables: any) => Promise<any>,
@@ -28,5 +26,5 @@ export async function subgraphLoadAll<T>(
 }
 
 export async function subgraphPurgeCacheKeyAtBlock(cacheKey: string, block: number): Promise<number> {
-    return cache.deleteKey(`${cacheKey}_${block}`);
+    return cacheWriter.deleteKey(`${cacheKey}_${block}`);
 }

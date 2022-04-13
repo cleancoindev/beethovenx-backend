@@ -14,15 +14,17 @@ import {
 import { schema } from './graphql_schema_generated';
 import { resolvers } from './app/resolvers';
 import { scheduleWorkerTasks } from './app/scheduleWorkerTasks';
-import { redis } from './modules/cache/redis';
+import { redisReader } from './modules/cache/redis-reader';
 import { scheduleMainTasks } from './app/scheduleMainTasks';
 import helmet from 'helmet';
 import GraphQLJSON from 'graphql-type-json';
 import { balancerService } from './modules/balancer/balancer.service';
+import { redisWriter } from './modules/cache/redis-writer';
 
 async function startServer() {
     //need to open the redis connection prior to adding the rate limit middleware
-    await redis.connect();
+    await redisReader.connect();
+    await redisWriter.connect();
 
     const app = createExpressApp();
     app.get('/balancer/pools', async (req, res) => {

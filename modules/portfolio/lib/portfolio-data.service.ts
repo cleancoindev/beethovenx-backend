@@ -10,10 +10,11 @@ import { FarmFragment, FarmUserFragment } from '../../masterchef-subgraph/genera
 import { BeetsBarFragment, BeetsBarUserFragment } from '../../beets-bar-subgraph/generated/beets-bar-subgraph-types';
 import { PrismaBalancerPoolSnapshotWithTokens, PrismaBlockExtended, UserPortfolioData } from '../portfolio-types';
 import { PrismaBalancerPool } from '@prisma/client';
-import { cache } from '../../cache/cache';
+import { cacheReader } from '../../cache/cache-reader';
 import { oneDayInMinutes } from '../../util/time';
 import { balancerService } from '../../balancer/balancer.service';
 import { GqlBalancerPool } from '../../../schema';
+import { cacheWriter } from '../../cache/cache-writer';
 
 const LAST_BLOCK_CACHED_KEY = 'portfolio:data:last-block-cached';
 const HISTORY_CACHE_KEY_PREFIX = 'portfolio:data:history:';
@@ -37,8 +38,11 @@ export class PortfolioDataService {
         }
 
         const cachedPools = await balancerService.getPools();
-        const { pools: subgraphPools, previousPools: subgraphPreviousPools } =
-            await balancerSubgraphService.getPortfolioPoolsData(parseInt(previousBlock.number));
+        const cachedSubgraphPools = await balancerSubgraphService.getPortfolioPoolsData(parseInt(previousBlock.number));
+        if (!cachedSubgraphPools) {
+            return null;
+        }
+        const { pools: subgraphPools, previousPools: subgraphPreviousPools } = cachedSubgraphPools;
 
         const pools = this.injectTokenPriceRates(subgraphPools, cachedPools);
         const previousPools = this.injectTokenPriceRates(subgraphPreviousPools, cachedPools);
@@ -202,17 +206,17 @@ export class PortfolioDataService {
     }
 
     public async getCachedPortfolioHistory(address: string): Promise<UserPortfolioData[] | null> {
-        const timestamp = await cache.getValue(LAST_BLOCK_CACHED_KEY);
+        const timestamp = await cacheReader.getValue(LAST_BLOCK_CACHED_KEY);
 
         if (!timestamp) {
             return null;
         }
 
-        return cache.getObjectValue<UserPortfolioData[]>(`${HISTORY_CACHE_KEY_PREFIX}${timestamp}:${address}`);
+        return cacheReader.getObjectValue<UserPortfolioData[]>(`${HISTORY_CACHE_KEY_PREFIX}${timestamp}:${address}`);
     }
 
     public async cachePortfolioHistory(address: string, timestamp: number, data: UserPortfolioData[]): Promise<void> {
-        await cache.putObjectValue<UserPortfolioData[]>(
+        await cacheWriter.putObjectValue<UserPortfolioData[]>(
             `${HISTORY_CACHE_KEY_PREFIX}${timestamp}:${address}`,
             data,
             oneDayInMinutes,
@@ -223,7 +227,7 @@ export class PortfolioDataService {
         const latestBlock = await prisma.prismaBlock.findFirst({ orderBy: { timestamp: 'desc' } });
 
         if (latestBlock) {
-            await cache.putValue(LAST_BLOCK_CACHED_KEY, `${latestBlock.timestamp}`);
+            await cacheWriter.putValue(LAST_BLOCK_CACHED_KEY, `${latestBlock.timestamp}`);
         }
     }
 

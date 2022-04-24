@@ -87,9 +87,11 @@ async function startServer() {
 
     await new Promise<void>((resolve) => httpServer.listen({ port: env.PORT }, resolve));
     console.log(`🚀 Server ready at http://localhost:${env.PORT}${server.graphqlPath}`);
+    console.log(`THIS IS THE PLAYGROUND ENV`);
 
     if (process.env.WORKER === 'true') {
         try {
+            console.log(`THIS IS THE PLAYGROUND ENV FOR WORKERS`);
             scheduleWorkerTasks();
         } catch (e) {
             console.log(`Fatal error happened during cron scheduling.`, e);

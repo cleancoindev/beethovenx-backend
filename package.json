@@ -40,7 +40,7 @@
         "moment-timezone": "^0.5.34",
         "node-cron": "^3.0.0",
         "pino-http": "^6.0.0",
-        "prisma": "3.6.0",
+        "prisma": "3.12.0",
         "redis": "^4.0.1",
         "safe-compare": "^1.1.4",
         "ts-dotenv": "^0.8.1",
